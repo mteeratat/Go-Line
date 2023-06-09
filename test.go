@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"time"
 
@@ -85,7 +86,7 @@ var luckycolor = []ShirtColor{
 	{ID: "7", Day: "Saturday", Color: "Purple"},
 }
 
-var linetoken = "s1P1F7Rm3tO6sxUpAPuY7TuTF315zXav7b0U8QwBoRm"
+var linetoken = os.Getenv("linetoken")
 
 // func getbookHandler(c *gin.Context) {
 // 	c.JSON(
