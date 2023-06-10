@@ -27,9 +27,9 @@ type ShirtColor struct {
 	Color string `json:"color"`
 }
 
-type Message struct {
-	Message string `json:"message"`
-}
+// type Message struct {
+// 	Message string `json:"message"`
+// }
 
 // JSON-to-Go : https://mholt.github.io/json-to-go/
 type WeatherData struct {
@@ -40,16 +40,9 @@ type WeatherData struct {
 	Timezone             string  `json:"timezone"`
 	TimezoneAbbreviation string  `json:"timezone_abbreviation"`
 	Elevation            float64 `json:"elevation"`
-	CurrentWeather       struct {
-		Temperature   float64 `json:"temperature"`
-		Windspeed     float64 `json:"windspeed"`
-		Winddirection float64 `json:"winddirection"`
-		Weathercode   int     `json:"weathercode"`
-		IsDay         int     `json:"is_day"`
-		Time          string  `json:"time"`
-	} `json:"current_weather"`
-	DailyUnits struct {
+	DailyUnits           struct {
 		Time                   string `json:"time"`
+		Weathercode            string `json:"weathercode"`
 		Temperature2MMax       string `json:"temperature_2m_max"`
 		Temperature2MMin       string `json:"temperature_2m_min"`
 		ApparentTemperatureMax string `json:"apparent_temperature_max"`
@@ -57,9 +50,11 @@ type WeatherData struct {
 		Sunrise                string `json:"sunrise"`
 		Sunset                 string `json:"sunset"`
 		UvIndexMax             string `json:"uv_index_max"`
+		PrecipitationSum       string `json:"precipitation_sum"`
 	} `json:"daily_units"`
 	Daily struct {
 		Time                   []string  `json:"time"`
+		Weathercode            []int     `json:"weathercode"`
 		Temperature2MMax       []float64 `json:"temperature_2m_max"`
 		Temperature2MMin       []float64 `json:"temperature_2m_min"`
 		ApparentTemperatureMax []float64 `json:"apparent_temperature_max"`
@@ -67,6 +62,7 @@ type WeatherData struct {
 		Sunrise                []string  `json:"sunrise"`
 		Sunset                 []string  `json:"sunset"`
 		UvIndexMax             []float64 `json:"uv_index_max"`
+		PrecipitationSum       []float64 `json:"precipitation_sum"`
 	} `json:"daily"`
 }
 
@@ -149,14 +145,30 @@ func getcolor() string {
 	return color
 }
 
+func getuv(uvnum float64) string {
+	uv := fmt.Sprintf("%v", uvnum)
+	if uvnum < 3 {
+		uv = uv + "(Low)"
+	} else if uvnum < 6 {
+		uv = uv + "(Moderate)"
+	} else if uvnum < 8 {
+		uv = uv + "(High)"
+	} else if uvnum < 11 {
+		uv = uv + "(Very high)"
+	} else {
+		uv = uv + "(Extreme)"
+	}
+	return uv
+}
+
+// https://open-meteo.com/en/docs
 func getweather() string {
-	urlStr := "https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max&current_weather=true&forecast_days=1&timezone=Asia%2FBangkok"
+	urlStr := "https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&daily=weathercode,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum&forecast_days=1&timezone=Asia%2FBangkok"
 	res, _ := http.Get(urlStr)
 	resBody, _ := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	var data WeatherData
 	json.Unmarshal(resBody, &data)
-	uvmax := fmt.Sprintf("%v", data.Daily.UvIndexMax[0])
 	date := fmt.Sprintf("%v", data.Daily.Time[0])
 	tempmax := fmt.Sprintf("%v", data.Daily.Temperature2MMax[0])
 	tempmin := fmt.Sprintf("%v", data.Daily.Temperature2MMin[0])
@@ -164,43 +176,24 @@ func getweather() string {
 	set := fmt.Sprintf("%v", data.Daily.Sunset[0][11:])
 	aptempmax := fmt.Sprintf("%v", data.Daily.ApparentTemperatureMax[0])
 	aptempmin := fmt.Sprintf("%v", data.Daily.ApparentTemperatureMin[0])
-	return "Date : " + date + "\nTemp : " + tempmin + " - " + tempmax + "\nFeel like : " + aptempmin + " - " + aptempmax + "\nSunrise : " + rise + "\nSunset : " + set + "\nUV : " + uvmax
+
+	// prec := fmt.Sprintf("%v", data.Daily.PrecipitationSum[0])
+	// wecode := getwecode(data.Daily.Weathercode[0])
+
+	uv := getuv(data.Daily.UvIndexMax[0])
+
+	return "Date : " + date + "\nTemp : " + tempmin + "°C - " + tempmax + "°C\nFeels like : " + aptempmin + "°C - " + aptempmax + "°C\nSunrise : " + rise + "\nSunset : " + set + "\nUV : " + uv
 }
 
 func noti(c *gin.Context) {
 	dt := time.Now().Weekday()
-	// color := "White"
-	// switch dt.String() {
-	// case luckycolor[0].Day:
-	// 	color = luckycolor[0].Color
-	// 	fmt.Println(color)
-	// case luckycolor[1].Day:
-	// 	color = luckycolor[1].Color
-	// 	fmt.Println(color)
-	// case luckycolor[2].Day:
-	// 	color = luckycolor[2].Color
-	// 	fmt.Println(color)
-	// case luckycolor[3].Day:
-	// 	color = luckycolor[3].Color
-	// 	fmt.Println(color)
-	// case luckycolor[4].Day:
-	// 	color = luckycolor[4].Color
-	// 	fmt.Println(color)
-	// case luckycolor[5].Day:
-	// 	color = luckycolor[5].Color
-	// 	fmt.Println(color)
-	// case luckycolor[6].Day:
-	// 	color = luckycolor[6].Color
-	// 	fmt.Println(color)
-	// }
 
 	color := getcolor()
 
 	weather := getweather()
-	print(weather)
 
 	cli := linenotify.NewClient()
-	cli.Notify(context.Background(), linetoken, dt.String()+"\nLucky Color : "+color+"\nWeather :\n"+weather, "", "", nil)
+	cli.Notify(context.Background(), linetoken, dt.String()+"\n\nWeather :\n"+weather+"\n\nLucky Color : "+color, "", "", nil)
 }
 
 func main() {
